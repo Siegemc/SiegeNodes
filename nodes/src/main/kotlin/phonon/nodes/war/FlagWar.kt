@@ -58,6 +58,7 @@ import phonon.nodes.objects.Coord
 import phonon.nodes.objects.Territory
 import phonon.nodes.objects.TerritoryChunk
 import phonon.nodes.objects.Town
+import phonon.nodes.objects.Warzone
 import java.nio.file.Files
 import java.util.EnumSet
 import java.util.UUID
@@ -368,13 +369,36 @@ public object FlagWar {
     // 1. check chunk is valid target, flag placement valid,
     //    and player can attack
     // 2. create and run attack timer thread
-    internal fun beginAttack(attacker: UUID, attackingTown: Town, chunk: TerritoryChunk, flagBase: Block): Result<Attack> {
+    internal fun beginAttack(attacker: UUID, attackingTown: Town, chunk: TerritoryChunk, warzone: Warzone, flagBase: Block): Result<Attack> {
         val world = flagBase.getWorld()
         val flagBaseX = flagBase.x
         val flagBaseY = flagBase.y
         val flagBaseZ = flagBase.z
         val territory = chunk.territory
         val territoryTown = territory.town
+
+        val warzone = Nodes.getWarzoneFromTerritory(territory.id)
+        if (warzone != null) {
+            val attackingNation = attackingTown.nation
+
+            if (attackingNation == null) {
+                return Result.failure(Exception("[War] Must be in a nation to attack warzones"))
+            }
+
+            if (!warzone.canAttack(attackingNation)) {
+                if (warzone.controllingNation == attackingNation) {
+                    return Result.failure(Exception("[War] You already control this warzone"))
+                }
+                return Result.failure(Exception("[War] Nation must declare war on this warzone first"))
+            }
+
+            // Check if attacking from ally-controlled warzone territory
+            if (warzone.controllingNation != null) {
+                if (attackingNation.allies.contains(warzone.controllingNation)) {
+                    return Result.failure(Exception("[War] Cannot attack warzone controlled by ally"))
+                }
+            }
+        }
 
         // run checks that chunk attack is valid
 
@@ -926,6 +950,20 @@ public object FlagWar {
         // chunk should not be null unless territory swapped
         // out during attack and chunks were modified in new territory
         val chunk = Nodes.getTerritoryChunkFromCoord(attack.coord)
+
+        if (chunk == null) {
+            Nodes.logger?.severe("finishAttack(): TerritoryChunk at ${attack.coord} is null")
+            return
+        }
+
+        val territory = chunk.territory
+        val warzone = Nodes.getWarzoneFromTerritory(territory.id)
+
+        if (warzone != null) {
+            handleWarzoneCapture(attack, chunk, territory, warzone)
+            return
+        }
+
         if (chunk == null) {
             Nodes.logger?.severe("finishAttack(): TerritoryChunk at ${attack.coord} is null")
             return
@@ -1110,4 +1148,42 @@ public object FlagWar {
             attack.beamIdsByPlayer[player.uniqueId] = entityIds
         }
     }
+
+    private fun handleWarzoneCapture(attack: Attack, chunk: TerritoryChunk, territory: Territory, warzone: Warzone) {
+        val attackingNation = attack.town.nation
+        if (attackingNation == null) return
+
+        chunk.attacker = null
+        chunk.occupier = attack.town
+
+        // Update warzone capture progress
+        val captureState = warzone.captureProgress[territory.id]
+        if (captureState != null) {
+            // If different nation is capturing, reset progress
+            if (captureState.capturingNation != attackingNation) {
+                captureState.capturedChunks = 1
+                captureState.capturingNation = attackingNation
+            } else {
+                captureState.capturedChunks += 1
+            }
+
+            val attacker = Nodes.getResidentFromUUID(attack.attacker)
+            Message.broadcast("${ChatColor.DARK_RED}[Warzone] ${attacker?.name} captured chunk in ${warzone.name} (${captureState.capturedChunks}/${captureState.totalChunks})")
+
+            // Check if territory fully captured
+            if (captureState.capturedChunks >= captureState.totalChunks) {
+                Message.broadcast("${ChatColor.DARK_RED}[Warzone] ${attackingNation.name} captured territory ${territory.id} in ${warzone.name}!")
+
+                // Check if entire warzone captured
+                if (warzone.isFullyCaptured(attackingNation)) {
+                    warzone.updateControl(attackingNation)
+                    Message.broadcast("${ChatColor.DARK_RED}${ChatColor.BOLD}[Warzone] ${attackingNation.name} has taken control of ${warzone.name}!")
+                }
+            }
+        }
+
+        FlagWar.occupiedChunks.add(chunk.coord)
+        Nodes.renderMinimaps()
+    }
+
 }

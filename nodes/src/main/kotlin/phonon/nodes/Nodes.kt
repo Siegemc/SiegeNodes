@@ -22,6 +22,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.DoubleChestInventory
 import org.bukkit.inventory.Inventory
 import org.bukkit.plugin.Plugin
+import phonon.nodes.objects.Warzone
 import phonon.nodes.chat.ChatMode
 import phonon.nodes.constants.DiplomaticRelationship
 import phonon.nodes.constants.ErrorAlreadyAllies
@@ -165,6 +166,8 @@ public object Nodes {
 
     // flag that plugin is running
     internal var enabled: Boolean = false
+
+
 
     // initialization:
     // - set links to plugin variables
@@ -855,6 +858,88 @@ public object Nodes {
     }
 
     public fun getTerritoryChunkFromCoord(coord: Coord): TerritoryChunk? = Nodes.territoryChunks.get(coord)
+
+
+    // ==============================================
+    // Warzone functions
+    // ==============================================
+
+    val warzones: HashMap<String, Warzone> = hashMapOf()
+
+    fun loadWarzones() {
+        warzones.clear()
+
+        for ((name, config) in Config.warzones) {
+            val territoryIds = config.territoryIds.map { TerritoryId(it) }
+
+            val warzone = Warzone(
+                name = config.name,
+                territories = territoryIds,
+            )
+
+            // Initialize capture progress
+            for (territoryId in territoryIds) {
+                val territory = territories[territoryId]
+                if (territory != null) {
+                    warzone.captureProgress[territoryId] = Warzone.CaptureState(
+                        totalChunks = territory.chunks.size
+                    )
+                }
+            }
+
+            warzones[name] = warzone
+        }
+    }
+
+    fun getWarzoneFromTerritory(territoryId: TerritoryId): Warzone? {
+        return warzones.values.find { it.territories.contains(territoryId) }
+    }
+
+    fun getWarzoneFromChunk(chunk: TerritoryChunk): Warzone? {
+        return getWarzoneFromTerritory(chunk.territory.id)
+    }
+
+    fun getNationFromUUID(uuid: UUID): Nation? {
+        return nations.values.find { it.uuid == uuid }
+    }
+
+    fun declareWarOnWarzone(nation: Nation, warzone: Warzone): Result<Unit> {
+        if (warzone.nationsAtWar.contains(nation)) {
+            return Result.failure(Exception("Nation already at war with this warzone"))
+        }
+
+        warzone.nationsAtWar.add(nation)
+        warzone.needsUpdate()
+        return Result.success(Unit)
+    }
+
+    fun endWarWithWarzone(nation: Nation, warzone: Warzone) {
+        warzone.nationsAtWar.remove(nation)
+
+        // Reset capture progress for this nation
+        for ((territoryId, state) in warzone.captureProgress) {
+            if (state.capturingNation?.uuid == nation.uuid) {
+                state.capturedChunks = 0
+                state.capturingNation = null
+            }
+        }
+
+        // If they were controlling, they lose control
+        if (warzone.controllingNation == nation) {
+            warzone.loseControl()
+        }
+
+        warzone.needsUpdate()
+    }
+
+    // Periodic task to save warzone stats (call this from your main save loop)
+    fun updateWarzoneStats() {
+        for (warzone in warzones.values) {
+            if (warzone.controllingNation != null) {
+                warzone.needsUpdate()
+            }
+        }
+    }
 
     // ==============================================
     // Territory functions

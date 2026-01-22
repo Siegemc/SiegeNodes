@@ -15,6 +15,7 @@ import phonon.nodes.Nodes.logger
 import phonon.nodes.objects.OreDeposit
 import phonon.nodes.objects.TabConfig
 import phonon.nodes.objects.TerritoryResources
+import phonon.nodes.war.Warzone.WarzoneConfig
 import java.nio.file.Paths
 import java.util.EnumMap
 import java.util.EnumSet
@@ -307,6 +308,16 @@ public object Config {
     // ===================================
     // allow allied nations to attack eachother
     public var allowAllyFriendlyFire: Boolean = true
+
+    // ===================================
+    // warzone settings
+    // ===================================
+
+    val warzones: HashMap<String, WarzoneConfig> = hashMapOf()
+
+    var warzonesEnabled: Boolean = false
+    var warzoneControlTime: Long = 3600000 // Time to maintain control (ms)
+    var warzoneRequireFullCapture: Boolean = true // Must capture all chunks
 
     // ===================================
     // captured territory tax rates:

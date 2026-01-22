@@ -52,6 +52,21 @@ canInteractInUnclaimed: true
 # only allow shearing in sheep node
 requireSheepNodeToShear: true
 
+# ===================================
+# warzone settings
+# ===================================
+
+warzones:
+  enabled: true
+  require_full_capture: false
+  zones:
+    - name: "Central Keep"
+      description: "Strategic fortress in the center"
+      territories: [100, 101, 102]
+    - name: "Eastern Outpost"
+      description: "Resource-rich eastern territory"
+      territories: [200, 201]
+
 # ===========================================
 # town settings
 # ===========================================

@@ -43,6 +43,7 @@ import phonon.nodes.listeners.NodesWarFlagArmorStandListener
 import phonon.nodes.listeners.NodesWorldListener
 import phonon.nodes.nametags.NametagListener
 import phonon.nodes.nodesaddons.NodesMineBuff
+import phonon.nodes.nodesaddons.WarzoneControlBar
 import phonon.nodes.placeholders.NodesExpansion
 import phonon.nodes.utils.loadLongFromFile
 import phonon.nodes.war.FlagWar
@@ -62,6 +63,8 @@ public class NodesPlugin : JavaPlugin() {
 
         // initialize nodes
         Nodes.initialize(this)
+
+        WarzoneControlBar.enable()
 
         // ===================================
         // save hooks to external plugins
@@ -191,6 +194,8 @@ public class NodesPlugin : JavaPlugin() {
 
         // world cleanup
         Nodes.cleanup()
+
+        WarzoneControlBar.disable()
 
         // final synchronous save of world
         // -> only save when world was properly initialized,
