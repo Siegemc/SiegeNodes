@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
-    compileOnly("me.clip:placeholderapi:2.11.7")
+    compileOnly("me.clip:placeholderapi:2.12.0")
     compileOnly("com.github.NEZNAMY","TAB-API","5.4.0")
     compileOnly("com.google.code.gson:gson:2.13.2")
 
